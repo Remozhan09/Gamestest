@@ -326,7 +326,7 @@ function startVideo(side){
  const vb=$(side?'cardB':'cardA').querySelector('.vbox');if(!vb||!vb.dataset.vid)return;
  yt('pauseVideo',1-side);
  vb.onclick=null;
- vb.innerHTML=`<iframe src="https://www.youtube-nocookie.com/embed/${vb.dataset.vid}?autoplay=1&rel=0&playsinline=1&enablejsapi=1&origin=${encodeURIComponent(location.origin)}" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe>`;
+ vb.innerHTML=`<iframe src="https://www.youtube.com/embed/${vb.dataset.vid}?autoplay=1&rel=0&playsinline=1&enablejsapi=1&origin=${encodeURIComponent(location.origin)}" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>`;
  const i=vb.querySelector('iframe');vstate[side]=1;lastSide=side;
  i.addEventListener('load',()=>{try{i.contentWindow.postMessage(JSON.stringify({event:'listening',id:side}),'*')}catch(e){}});
 }
