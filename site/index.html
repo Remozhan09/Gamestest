@@ -76,6 +76,21 @@ td a{color:var(--acc2);text-decoration:none;font-size:12px;white-space:nowrap}
 .champ h2{font-family:'Russo One';font-size:clamp(26px,5vw,40px);margin:6px 0}
 .two{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 .same{color:var(--ok);font-weight:800}
+.btn.hard{background:#3a2f12;border-color:#7a6220;color:var(--acc2)}
+.hpanel{background:var(--panel);border:1px solid var(--line);border-radius:18px;max-width:900px;width:100%;max-height:90svh;overflow:auto;padding:14px}
+.hhead{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;font-size:18px}
+.hgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.hcol{border-radius:14px;padding:14px;display:flex;flex-direction:column}
+.hcol h4{font-family:'Russo One';font-size:20px;margin:0 0 2px;line-height:1.15}
+.hcol .yy{opacity:.75;font-weight:600;margin-bottom:10px;font-size:13px}
+.hcol ul{margin:0 0 10px;padding:0;list-style:none}
+.hcol li{padding:6px 0 6px 26px;position:relative;line-height:1.35;font-size:14px;border-bottom:1px solid rgba(255,255,255,.08)}
+.hcol li::before{position:absolute;left:2px;top:6px}
+.hcol ul.p li::before{content:'👍'}
+.hcol ul.m li::before{content:'👎'}
+.hcol .lbl{font-size:12px;text-transform:uppercase;letter-spacing:1px;opacity:.7;margin:4px 0 2px}
+.hcol .choose{margin-top:auto}
+@media (max-width:720px){.hgrid{grid-template-columns:1fr}.hcol h4{font-size:17px}}
 .toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:#222838;border:1px solid var(--line);padding:10px 16px;border-radius:12px;font-weight:600;opacity:0;transition:opacity .2s;pointer-events:none}
 .toast.on{opacity:1}
 .overlay{position:fixed;inset:0;background:rgba(5,6,10,.82);display:flex;align-items:center;justify-content:center;padding:20px;z-index:5}
@@ -128,17 +143,6 @@ td a{color:var(--acc2);text-decoration:none;font-size:12px;white-space:nowrap}
   <p class="note" style="margin:10px 0 0" id="sizeNote"></p>
  </div>
 
- <div class="panel">
-  <h3>Режим</h3>
-  <div class="chips" id="modeChips">
-   <button class="chip on" data-mode="1">Один игрок</button>
-   <button class="chip" data-mode="2">Вдвоём — по очереди, потом сравнение</button>
-  </div>
-  <div class="row" style="margin-top:12px" id="names">
-   <input type="text" id="n1" placeholder="Имя игрока 1" maxlength="20">
-   <input type="text" id="n2" placeholder="Имя игрока 2" maxlength="20" class="hidden">
-  </div>
- </div>
 
  <button class="big" id="startBtn">Начать</button>
  <p class="note" style="margin-top:12px">В каждой карточке — трейлер с YouTube. У некоторых игр есть вкладка «🎬 Сцена» с особым моментом из игры. Выбор — кнопкой «Выбрать» под видео.</p>
@@ -158,6 +162,7 @@ td a{color:var(--acc2);text-decoration:none;font-size:12px;white-space:nowrap}
   <div class="card" id="cardB"></div>
  </div>
  <div class="tools">
+  <button class="btn hard" id="hardBtn">🤔 Затрудняемся</button>
   <button class="btn" id="undoBtn">↶ Отменить выбор</button>
   <button class="btn" id="quitBtn">Выйти в меню</button>
  </div>
@@ -168,21 +173,20 @@ td a{color:var(--acc2);text-decoration:none;font-size:12px;white-space:nowrap}
 
 </div>
 
-<div class="overlay hidden" id="handoff">
- <div class="panel">
-  <h3>Ход передаётся</h3>
-  <p id="handoffText" style="font-size:18px;font-weight:700"></p>
-  <button class="big" id="handoffBtn">Поехали</button>
+<div class="overlay hidden" id="hardBox">
+ <div class="hpanel">
+  <div class="hhead"><b>Плюсы и минусы</b><button class="btn" id="hardClose">✕</button></div>
+  <div class="hgrid" id="hardGrid"></div>
  </div>
 </div>
 <div class="toast" id="toast"></div>
 
 <script>
-let GAMES=[],SPECIAL={},VID={};
+let GAMES=[],SPECIAL={},VID={},PC={};
 async function loadData(){
  const j=u=>fetch(u,{cache:'no-cache'}).then(r=>r.ok?r.json():null).catch(()=>null);
- const [raw,sp,vid]=await Promise.all([j('games.json'),j('specials.json'),j('videos.json')]);
- SPECIAL=sp||{};VID=vid||{};
+ const [raw,sp,vid,pc]=await Promise.all([j('games.json'),j('specials.json'),j('videos.json'),j('proscons.json')]);
+ SPECIAL=sp||{};VID=vid||{};PC=pc||{};
  GAMES=(raw||[]).map((g,i)=>({id:i,t:g[0],y:g[1],odd:!!g[2],v:(VID[g[0]]||{}).t||null,s:(VID[g[0]]||{}).s||null}));
 }
 const YT = q => 'https://www.youtube.com/results?search_query=' + encodeURIComponent(q);
@@ -205,7 +209,6 @@ function initSetup(){
  $('yFrom').onchange=()=>{opt.from=+$('yFrom').value;if(opt.from>opt.to){opt.to=opt.from;$('yTo').value=opt.to}renderSizes()};
  $('yTo').onchange=()=>{opt.to=+$('yTo').value;if(opt.to<opt.from){opt.from=opt.to;$('yFrom').value=opt.from}renderSizes()};
  document.querySelectorAll('#poolChips .chip').forEach(b=>b.onclick=()=>{opt.pool=b.dataset.pool;document.querySelectorAll('#poolChips .chip').forEach(x=>x.classList.toggle('on',x===b));renderSizes()});
- document.querySelectorAll('#modeChips .chip').forEach(b=>b.onclick=()=>{opt.mode=+b.dataset.mode;document.querySelectorAll('#modeChips .chip').forEach(x=>x.classList.toggle('on',x===b));$('n2').classList.toggle('hidden',opt.mode!==2)});
  $('startBtn').onclick=start;
  $('onlyVid').onchange=()=>{opt.onlyVid=$('onlyVid').checked;renderSizes()};
  $('dropBtn').onclick=()=>{store.del(SAVE);$('resumeBox').style.display='none'};
@@ -227,8 +230,7 @@ function renderSizes(){
 function start(){
  const pool=shuffle(filtered().map(g=>g.id)).slice(0,opt.size);
  if(pool.length<2)return;
- const names=[$('n1').value.trim()||'Игрок 1',$('n2').value.trim()||'Игрок 2'];
- S={mode:opt.mode,names:opt.mode===2?names:[names[0]],initial:pool,player:0,runs:[],phase:'play',total:pool.length-1};
+ S={mode:1,names:['Наш выбор'],initial:pool,player:0,runs:[],phase:'play',total:pool.length-1};
  newRun();
  showMatch();
 }
@@ -264,13 +266,6 @@ function finishRun(){
  const c=S.cur;const champ=c.next[0];
  S.runs.push({champ,lost:c.lost,rounds:c.round});
  delete S.cur;
- if(S.mode===2&&S.runs.length<2){
-  S.player=1;newRun();store.set(SAVE,S);
-  $('handoffText').textContent=`${S.names[0]} закончил(а). Теперь ход: ${S.names[1]}. Те же игры, свои выборы.`;
-  $('handoff').classList.remove('hidden');
-  $('handoffBtn').onclick=()=>{$('handoff').classList.add('hidden');renderMatch()};
-  return;
- }
  S.phase='done';store.del(SAVE);showResults();
 }
 
@@ -282,7 +277,7 @@ function renderMatch(){
  const c=S.cur;if(!c)return;
  const a=GAMES[c.list[c.i]],b=GAMES[c.list[c.i+1]];
  const remaining=c.list.length;const inRound=Math.floor(remaining/2);const done=Math.floor(c.i/2)+1;
- $('who').textContent=S.mode===2?`Выбирает: ${S.names[S.player]}`:S.names[0];
+ $('who').textContent=`Игр в турнире: ${S.initial.length}`;
  $('roundLbl').textContent=roundName(remaining);
  $('matchLbl').textContent=`Пара ${done} из ${inRound}`;
  $('barFill').style.width=(100*c.picks/S.total)+'%';
@@ -329,29 +324,36 @@ function showResults(){
  const lim=showAll?Infinity:16;
  const total=S.initial.length;
  let h='';
- if(S.mode===1){
+
   const g=GAMES[S.runs[0].champ];
   h+=`<div class="champ" style="background:${cardBg(g)}"><div class="crown">🏆</div><div class="note" style="color:#fff;opacity:.8">Лучшая игра из ${total}</div><h2>${esc(g.t)}</h2><div>${g.y}</div></div>`;
-  h+=`<div class="panel"><h3>Твой топ</h3>${table(S.runs[0],lim)}</div>`;
- }else{
-  const top=k=>new Set(ranking(S.runs[k]).slice(0,8).map(r=>r.id));
-  const t0=top(0),t1=top(1);const both=new Set([...t0].filter(x=>t1.has(x)));
-  const same=S.runs[0].champ===S.runs[1].champ;
-  h+=`<div class="champ" style="background:linear-gradient(120deg,#3a1d4f,#14324a)"><div class="crown">${same?'🤝':'⚔️'}</div><h2>${same?'Одинаковый победитель!':'Разные победители'}</h2><div>${esc(S.names[0])}: <b>${esc(GAMES[S.runs[0].champ].t)}</b> · ${esc(S.names[1])}: <b>${esc(GAMES[S.runs[1].champ].t)}</b></div><div class="note" style="color:#fff;opacity:.85;margin-top:6px">Совпадений в топ-8: ${both.size} из 8 (отмечены ✓)</div></div>`;
-  h+=`<div class="two">`+[0,1].map(k=>`<div class="panel"><h3>Топ — ${esc(S.names[k])}</h3>${table(S.runs[k],lim,both)}</div>`).join('')+`</div>`;
- }
+  h+=`<div class="panel"><h3>Ваш топ</h3>${table(S.runs[0],lim)}</div>`;
  h+=`<div class="tools"><button class="btn" id="moreBtn">${showAll?'Показать топ-16':'Показать всю таблицу'}</button><button class="btn" id="copyBtn">Скопировать топ-10</button><button class="btn" id="againBtn">Новый турнир</button></div>`;
  $('results').innerHTML=h;
  $('moreBtn').onclick=()=>{showAll=!showAll;showResults()};
  $('againBtn').onclick=()=>{showAll=false;S=null;show('setup');$('resumeBox').style.display='none'};
  $('copyBtn').onclick=()=>{
-  const txt=S.runs.map((run,k)=>`${S.mode===2?S.names[k]+' — ':''}Топ игр (из ${total}):\n`+ranking(run).slice(0,10).map((r,i)=>`${i===0?'🏆':plTxt(r)}. ${GAMES[r.id].t} (${GAMES[r.id].y})`).join('\n')).join('\n\n');
+  const txt=S.runs.map((run,k)=>`Топ игр (из ${total}):\n`+ranking(run).slice(0,10).map((r,i)=>`${i===0?'🏆':plTxt(r)}. ${GAMES[r.id].t} (${GAMES[r.id].y})`).join('\n')).join('\n\n');
   Promise.resolve().then(()=>navigator.clipboard.writeText(txt)).then(()=>toast('Скопировано')).catch(()=>toast('Не удалось скопировать'));
  };
 }
 function toast(t){const el=$('toast');el.textContent=t;el.classList.add('on');setTimeout(()=>el.classList.remove('on'),1600)}
 
 $('undoBtn').onclick=undo;
+function openHard(){
+ const c=S&&S.cur;if(!c)return;
+ const pair=[GAMES[c.list[c.i]],GAMES[c.list[c.i+1]]];
+ $('hardGrid').innerHTML=pair.map((g,k)=>{const d=PC[g.t];
+  const li=a=>a.map(x=>`<li>${esc(x)}</li>`).join('');
+  return `<div class="hcol" style="background:${cardBg(g)}"><h4>${esc(g.t)}</h4><div class="yy">${g.y}</div>`+
+   (d?`<div class="lbl">За что любят</div><ul class="p">${li(d.p)}</ul><div class="lbl">Минусы</div><ul class="m">${li(d.m)}</ul>`:`<p class="note" style="color:#fff">Описание для этой игры ещё не готово.</p>`)+
+   `<button class="choose" data-k="${k}">✓ Выбрать эту</button></div>`}).join('');
+ $('hardGrid').querySelectorAll('.choose').forEach(b=>b.onclick=()=>{$('hardBox').classList.add('hidden');choose(+b.dataset.k)});
+ $('hardBox').classList.remove('hidden');
+}
+$('hardBtn').onclick=openHard;
+$('hardClose').onclick=()=>$('hardBox').classList.add('hidden');
+$('hardBox').onclick=e=>{if(e.target===$('hardBox'))$('hardBox').classList.add('hidden')};
 $('quitBtn').onclick=()=>{store.set(SAVE,S);show('setup');if(store.get(SAVE))$('resumeBox').style.display=''};
 $('startBtn').textContent='Загрузка…';
 loadData().then(()=>{$('startBtn').textContent='Начать';initSetup()});
