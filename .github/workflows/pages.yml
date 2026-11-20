@@ -28,6 +28,9 @@ jobs:
       - name: Установить yt-dlp
         run: pip install -U yt-dlp requests
 
+      - name: Добавить игры из Википедии (если задано в data/expand.json)
+        run: python scripts/expand_from_wikipedia.py
+
       - name: Найти ролики на YouTube
         env:
           BUDGET_MIN: "300"
@@ -38,8 +41,8 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898699+github-actions[bot]@users.noreply.github.com"
-          git add site/videos.json
-          git diff --cached --quiet || (git commit -m "Обновить ID роликов" && git push)
+          git add site/videos.json site/games.json data/
+          git diff --cached --quiet || (git commit -m "Обновить список игр и ID роликов" && git pull --rebase && git push)
 
       - uses: actions/configure-pages@v5
 
