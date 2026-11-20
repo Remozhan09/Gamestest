@@ -27,6 +27,15 @@ if cfg in done:
     print("Это расширение уже сделано — пропускаю"); sys.exit(0)
 
 games = json.load(open(GAMES, encoding="utf-8"))
+# Пересборка: убираем игры, добавленные прошлым расширением, и выбираем заново
+if os.path.exists(REPORT):
+    old = {l.rstrip("\n").split("\t")[3] for l in open(REPORT, encoding="utf-8") if l[:1].isdigit()}
+    before = len(games)
+    games = [g for g in games if g[0] not in old]
+    print(f"Убрано прошлых добавлений: {before - len(games)}")
+EXCLUDE_CAT = re.compile(r"eroge|pornograph|hentai|bish.jo|adult video game|visual novel|compilation|rom hack|"
+                         r"alternate reality|educational|synthesi|science game|typing|art game", re.I)
+EXCL_FILE = os.path.join(ROOT, "data", "expand_exclude.txt")
 y0, y1 = cfg["years"]
 years = list(range(y0, y1 + 1))
 need = max(0, cfg["target_total"] - len(games))
@@ -35,9 +44,10 @@ if not need:
     sys.exit(0)
 
 
-def norm(s):
+def norm(s, strip_paren=True):
     s = s.lower().replace("&", "and")
-    s = re.sub(r"\(.*?\)", " ", s)
+    if strip_paren:
+        s = re.sub(r"\(.*?\)", " ", s)
     s = re.sub(r"[^a-z0-9а-яё]+", " ", s)
     return re.sub(r"\s+", " ", s).strip()
 
@@ -47,17 +57,20 @@ def clean_title(t):
     return t.strip()
 
 
-existing = [(norm(g[0]), g[1]) for g in games]
+existing = [(norm(g[0]), g[1]) for g in games] + [(norm(g[0], False), g[1]) for g in games if "(" in g[0]]
 exist_exact = {n for n, _ in existing}
+manual = set()
+if os.path.exists(EXCL_FILE):
+    manual = {norm(l) for l in open(EXCL_FILE, encoding="utf-8") if l.strip() and not l.startswith("#")}
 
 
 def is_dup(title, year):
     n = norm(title)
-    if not n or n in exist_exact:
+    if not n or n in exist_exact or n in manual:
         return True
     if len(n) >= 5:
         for e, ey in existing:
-            if abs(ey - year) <= 1 and (n in e or e in n):
+            if len(e) >= 5 and (abs(ey - year) <= 1 or min(len(n), len(e)) >= 10) and (n in e or e in n):
                 return True
     return False
 
@@ -78,9 +91,10 @@ def api(params):
         else:
             raise RuntimeError("API недоступен")
         for p in d.get("query", {}).get("pages", []):
-            cur = out_pages.setdefault(p["pageid"], {"title": p["title"], "views": 0})
+            cur = out_pages.setdefault(p["pageid"], {"title": p["title"], "views": 0, "cats": []})
             for v in (p.get("pageviews") or {}).values():
                 cur["views"] += v or 0
+            cur["cats"] += [c["title"] for c in p.get("categories") or []]
         if "continue" not in d:
             return out_pages
         params.update(d["continue"])
@@ -91,11 +105,14 @@ cands = {}
 for y in years:
     pages = api({"action": "query", "generator": "categorymembers",
                  "gcmtitle": f"Category:{y} video games", "gcmnamespace": 0,
-                 "gcmlimit": 50, "prop": "pageviews", "pvipdays": 60})
+                 "gcmlimit": 50, "prop": "pageviews|categories", "pvipdays": 60,
+                 "clshow": "!hidden", "cllimit": "max"})
     lst = []
     for p in pages.values():
         t = p["title"]
         if t.lower().startswith(("list of", "category:")):
+            continue
+        if any(EXCLUDE_CAT.search(c) for c in p["cats"]):
             continue
         lst.append((p["views"], clean_title(t), y))
     lst.sort(reverse=True)
