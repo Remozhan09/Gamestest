@@ -61,6 +61,13 @@ select,input[type=text]{background:#1e2230;color:var(--text);border:1px solid va
 .tabs{display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap}
 .tabs button{background:rgba(0,0,0,.35);border:1px solid rgba(255,255,255,.2);color:#fff;border-radius:9px;padding:6px 10px;font:700 12px Inter;cursor:pointer}
 .tabs button.on{background:#fff;color:#111}
+.pc{margin:0 0 6px;padding:0;list-style:none}
+.pc li{position:relative;padding:3px 0 3px 24px;font-size:14px;line-height:1.3}
+.pc li::before{position:absolute;left:0;top:3px}
+.pc.p li::before{content:'👍'}
+.pc.m{margin-bottom:12px}
+.pc.m li{opacity:.85}
+.pc.m li::before{content:'👎'}
 .choose{display:block;width:100%;border:0;border-radius:12px;padding:13px;font:800 16px Inter;background:#fff;color:#111;cursor:pointer}
 .choose:active{transform:scale(.98)}
 .tools{display:flex;gap:8px;justify-content:center;margin-top:14px;flex-wrap:wrap}
@@ -91,6 +98,9 @@ td a{color:var(--acc2);text-decoration:none;font-size:12px;white-space:nowrap}
 .hcol .lbl{font-size:12px;text-transform:uppercase;letter-spacing:1px;opacity:.7;margin:4px 0 2px}
 .hcol .choose{margin-top:auto}
 @media (max-width:720px){.hgrid{grid-template-columns:1fr}.hcol h4{font-size:17px}}
+.keys{text-align:center;margin:12px 0 0}
+.keys b{display:inline-block;min-width:22px;padding:1px 6px;border:1px solid var(--line);border-bottom-width:3px;border-radius:6px;background:#1e2230;color:var(--text)}
+@media (hover:none){.keys{display:none}}
 .toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:#222838;border:1px solid var(--line);padding:10px 16px;border-radius:12px;font-weight:600;opacity:0;transition:opacity .2s;pointer-events:none}
 .toast.on{opacity:1}
 .overlay{position:fixed;inset:0;background:rgba(5,6,10,.82);display:flex;align-items:center;justify-content:center;padding:20px;z-index:5}
@@ -103,6 +113,7 @@ td a{color:var(--acc2);text-decoration:none;font-size:12px;white-space:nowrap}
  .card.v{height:auto}
  .cbody{padding:10px 12px 12px}
  .cbody .meta{display:none}
+ .pc li{font-size:13px;padding:2px 0 2px 22px}
  .card .yr{font-size:40px}
  .card .glyph{font-size:120px;bottom:30px}
  .two{grid-template-columns:1fr}
@@ -161,8 +172,8 @@ td a{color:var(--acc2);text-decoration:none;font-size:12px;white-space:nowrap}
   <div class="vs">VS</div>
   <div class="card" id="cardB"></div>
  </div>
+ <p class="keys note">Клавиши: <b>Q</b> / <b>E</b> — видео слева / справа (пуск и пауза) · <b>A</b> / <b>D</b> — выбрать левую / правую · <b>F</b> — видео на весь экран</p>
  <div class="tools">
-  <button class="btn hard" id="hardBtn">🤔 Затрудняемся</button>
   <button class="btn" id="undoBtn">↶ Отменить выбор</button>
   <button class="btn" id="quitBtn">Выйти в меню</button>
  </div>
@@ -281,6 +292,7 @@ function renderMatch(){
  $('roundLbl').textContent=roundName(remaining);
  $('matchLbl').textContent=`Пара ${done} из ${inRound}`;
  $('barFill').style.width=(100*c.picks/S.total)+'%';
+ vstate[0]=vstate[1]=null;lastSide=null;
  fill($('cardA'),a,0);fill($('cardB'),b,1);
  $('undoBtn').disabled=!c.hist.length;
 }
@@ -291,18 +303,62 @@ function fill(el,g,side){
  el.innerHTML=`<div class="vbox"></div><div class="cbody">
  ${tabs.length>1?`<div class="tabs">${tabs.map((x,k)=>`<button data-k="${k}" class="${k?'':'on'}">${esc(x[1])}</button>`).join('')}</div>`:''}
  <h2>${esc(g.t)}</h2><div class="meta">${g.y} · ${g.odd?'★ необычная':'хит'}${!g.v?` · <a style="color:#fff" href="${YT(g.t+' '+g.y+' trailer')}" target="_blank" rel="noopener">найти на YouTube</a>`:''}</div>
+ ${PC[g.t]?`<ul class="pc p">${PC[g.t].p.map(x=>`<li>${esc(x)}</li>`).join('')}</ul><ul class="pc m">${PC[g.t].m.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`:''}
  <button class="choose">✓ Выбрать</button></div>`;
  const vb=el.querySelector('.vbox');
  const showVid=id=>{
-  if(!id){vb.innerHTML=`<div class="novid"><div style="font-size:30px">🎮</div><div>${esc(g.t)}</div><div class="note" style="color:#fff">${g.y}</div></div>`;vb.onclick=null;return}
+  vstate[side]=null;
+  if(!id){vb.dataset.vid='';vb.innerHTML=`<div class="novid"><div style="font-size:30px">🎮</div><div>${esc(g.t)}</div><div class="note" style="color:#fff">${g.y}</div></div>`;vb.onclick=null;return}
   vb.innerHTML=`<img loading="lazy" alt="" src="https://i.ytimg.com/vi/${id}/hqdefault.jpg"><div class="play">▶</div>`;
-  vb.onclick=()=>{vb.innerHTML=`<iframe src="https://www.youtube-nocookie.com/embed/${id}?autoplay=1&rel=0&playsinline=1" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe>`;vb.onclick=null};
+  vb.onclick=()=>startVideo(side);
+  vb.dataset.vid=id;
  };
  showVid(tabs.length?tabs[0][2]:null);
  el.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{el.querySelectorAll('.tabs button').forEach(x=>x.classList.toggle('on',x===b));showVid(tabs[+b.dataset.k][2])});
  el.querySelector('.choose').onclick=()=>choose(side);
  el.onclick=null;
 }
+// ---------- видео: управление и горячие клавиши ----------
+const vstate=[null,null]; // null — не запущено, 1 — играет, 2 — пауза
+function ifr(side){return $(side?'cardB':'cardA').querySelector('.vbox iframe')}
+function yt(f,side){const i=ifr(side);if(i&&i.contentWindow)i.contentWindow.postMessage(JSON.stringify({event:'command',func:f,args:[]}),'*')}
+function startVideo(side){
+ const vb=$(side?'cardB':'cardA').querySelector('.vbox');if(!vb||!vb.dataset.vid)return;
+ yt('pauseVideo',1-side);
+ vb.onclick=null;
+ vb.innerHTML=`<iframe src="https://www.youtube-nocookie.com/embed/${vb.dataset.vid}?autoplay=1&rel=0&playsinline=1&enablejsapi=1&origin=${encodeURIComponent(location.origin)}" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe>`;
+ const i=vb.querySelector('iframe');vstate[side]=1;lastSide=side;
+ i.addEventListener('load',()=>{try{i.contentWindow.postMessage(JSON.stringify({event:'listening',id:side}),'*')}catch(e){}});
+}
+let lastSide=null;
+function toggleVideo(side){
+ if(!ifr(side)){startVideo(side);return}
+ if(vstate[side]===1){yt('pauseVideo',side);vstate[side]=2}
+ else{yt('pauseVideo',1-side);if(vstate[1-side]===1)vstate[1-side]=2;yt('playVideo',side);vstate[side]=1;lastSide=side}
+}
+window.addEventListener('message',e=>{
+ if(!/youtube/.test(e.origin))return;
+ let d;try{d=typeof e.data==='string'?JSON.parse(e.data):e.data}catch(x){return}
+ if(!d||!d.info||d.info.playerState===undefined)return;
+ [0,1].forEach(s=>{const i=ifr(s);if(i&&i.contentWindow===e.source){vstate[s]=d.info.playerState===1?1:2;if(d.info.playerState===1)lastSide=s}});
+});
+document.addEventListener('keydown',e=>{
+ if(e.ctrlKey||e.altKey||e.metaKey||e.repeat)return;
+ const tag=(e.target&&e.target.tagName)||'';if(/INPUT|SELECT|TEXTAREA/.test(tag))return;
+ if($('match').classList.contains('hidden')||!S||!S.cur)return;
+ const k=e.code;
+ if(k==='KeyQ'){toggleVideo(0)}
+ else if(k==='KeyE'){toggleVideo(1)}
+ else if(k==='KeyA'){choose(0)}
+ else if(k==='KeyD'){choose(1)}
+ else if(k==='KeyF'){
+  const s=vstate[0]===1?0:vstate[1]===1?1:lastSide;const i=s===null?null:ifr(s);
+  if(i){const r=i.requestFullscreen||i.webkitRequestFullscreen;if(r)Promise.resolve(r.call(i)).catch(()=>{})}
+ } else return;
+ e.preventDefault();
+});
+// после клика внутри видео возвращаем фокус странице, чтобы клавиши работали
+window.addEventListener('blur',()=>setTimeout(()=>{if(document.activeElement&&document.activeElement.tagName==='IFRAME'&&!document.fullscreenElement){window.focus()}},150));
 function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
 
 // ---------- results ----------
@@ -351,7 +407,6 @@ function openHard(){
  $('hardGrid').querySelectorAll('.choose').forEach(b=>b.onclick=()=>{$('hardBox').classList.add('hidden');choose(+b.dataset.k)});
  $('hardBox').classList.remove('hidden');
 }
-$('hardBtn').onclick=openHard;
 $('hardClose').onclick=()=>$('hardBox').classList.add('hidden');
 $('hardBox').onclick=e=>{if(e.target===$('hardBox'))$('hardBox').classList.add('hidden')};
 $('quitBtn').onclick=()=>{store.set(SAVE,S);show('setup');if(store.get(SAVE))$('resumeBox').style.display=''};
