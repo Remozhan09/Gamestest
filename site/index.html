@@ -9,13 +9,16 @@
 <style>
 :root{--bg:#0d0f14;--panel:#171a22;--line:#262b38;--text:#eef1f7;--muted:#9aa3b5;--acc:#ff4d6d;--acc2:#ffd166;--ok:#3ddc97}
 *{box-sizing:border-box}
-html,body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,system-ui,sans-serif}
-body{min-height:100vh}
+html,body{margin:0;color:var(--text);font-family:Inter,system-ui,sans-serif}
+body{min-height:100vh;background:transparent}
+body::before{content:'';position:fixed;inset:0;z-index:-2;background:#0d0f14 url(bg.jpg) center 45%/cover no-repeat}
+body::after{content:'';position:fixed;inset:0;z-index:-1;background:linear-gradient(rgba(10,12,16,.25),rgba(10,12,16,.55))}
+.hero{height:34vh;min-height:200px}
 .wrap{max-width:1100px;margin:0 auto;padding:16px}
-h1{font-family:'Russo One',sans-serif;font-size:clamp(26px,6vw,46px);margin:8px 0 4px;letter-spacing:.5px}
+h1{text-shadow:0 2px 16px rgba(0,0,0,.8);font-family:'Russo One',sans-serif;font-size:clamp(26px,6vw,46px);margin:8px 0 4px;letter-spacing:.5px}
 h1 span{color:var(--acc)}
-.sub{color:var(--muted);margin:0 0 18px}
-.panel{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px;margin-bottom:14px}
+.sub{text-shadow:0 1px 8px #000;color:#d6dbe6;margin:0 0 18px}
+.panel{background:rgba(23,26,34,.82);border:1px solid var(--line);border-radius:16px;padding:16px;margin-bottom:14px}
 .panel h3{margin:0 0 10px;font-size:15px;text-transform:uppercase;letter-spacing:1px;color:var(--muted)}
 .chips{display:flex;flex-wrap:wrap;gap:8px}
 .chip{border:1px solid var(--line);background:#1e2230;color:var(--text);border-radius:999px;padding:9px 14px;font:600 14px Inter;cursor:pointer}
@@ -125,6 +128,7 @@ td a{color:var(--acc2);text-decoration:none;font-size:12px;white-space:nowrap}
 
 <!-- SETUP -->
 <section id="setup">
+ <div class="hero"></div>
  <h1>Битва игр <span>1990–2026</span></h1>
  <p class="sub">Из двух игр выбирай одну — и так до единственной лучшей. В конце — таблица твоего топа.</p>
 
@@ -175,7 +179,7 @@ td a{color:var(--acc2);text-decoration:none;font-size:12px;white-space:nowrap}
  <p class="keys note">Клавиши: <b>Q</b> / <b>E</b> — видео слева / справа (пуск и пауза) · <b>A</b> / <b>D</b> — выбрать левую / правую · <b>F</b> — видео на весь экран</p>
  <div class="tools">
   <button class="btn" id="undoBtn">↶ Отменить выбор</button>
-  <button class="btn" id="quitBtn">Выйти в меню</button>
+  <button class="btn" id="quitBtn">↺ Начать заново</button>
  </div>
 </section>
 
@@ -241,7 +245,7 @@ function renderSizes(){
 function start(){
  const pool=shuffle(filtered().map(g=>g.id)).slice(0,opt.size);
  if(pool.length<2)return;
- S={mode:1,names:['Наш выбор'],initial:pool,player:0,runs:[],phase:'play',total:pool.length-1};
+ S={sig:GAMES.length,mode:1,names:['Наш выбор'],initial:pool,player:0,runs:[],phase:'play',total:pool.length-1};
  newRun();
  showMatch();
 }
@@ -277,7 +281,7 @@ function finishRun(){
  const c=S.cur;const champ=c.next[0];
  S.runs.push({champ,lost:c.lost,rounds:c.round});
  delete S.cur;
- S.phase='done';store.del(SAVE);showResults();
+ S.phase='done';store.set(SAVE,S);showResults();
 }
 
 // ---------- render match ----------
@@ -387,7 +391,7 @@ function showResults(){
  h+=`<div class="tools"><button class="btn" id="moreBtn">${showAll?'Показать топ-16':'Показать всю таблицу'}</button><button class="btn" id="copyBtn">Скопировать топ-10</button><button class="btn" id="againBtn">Новый турнир</button></div>`;
  $('results').innerHTML=h;
  $('moreBtn').onclick=()=>{showAll=!showAll;showResults()};
- $('againBtn').onclick=()=>{showAll=false;S=null;show('setup');$('resumeBox').style.display='none'};
+ $('againBtn').onclick=()=>{showAll=false;S=null;store.del(SAVE);show('setup');$('resumeBox').style.display='none'};
  $('copyBtn').onclick=()=>{
   const txt=S.runs.map((run,k)=>`Топ игр (из ${total}):\n`+ranking(run).slice(0,10).map((r,i)=>`${i===0?'🏆':plTxt(r)}. ${GAMES[r.id].t} (${GAMES[r.id].y})`).join('\n')).join('\n\n');
   Promise.resolve().then(()=>navigator.clipboard.writeText(txt)).then(()=>toast('Скопировано')).catch(()=>toast('Не удалось скопировать'));
@@ -409,9 +413,24 @@ function openHard(){
 }
 $('hardClose').onclick=()=>$('hardBox').classList.add('hidden');
 $('hardBox').onclick=e=>{if(e.target===$('hardBox'))$('hardBox').classList.add('hidden')};
-$('quitBtn').onclick=()=>{store.set(SAVE,S);show('setup');if(store.get(SAVE))$('resumeBox').style.display=''};
+let quitArm=null;
+$('quitBtn').onclick=()=>{
+ const b=$('quitBtn');
+ if(!quitArm){b.textContent='Точно сбросить? Нажми ещё раз';quitArm=setTimeout(()=>{quitArm=null;b.textContent='↺ Начать заново'},3000);return}
+ clearTimeout(quitArm);quitArm=null;b.textContent='↺ Начать заново';
+ S=null;store.del(SAVE);$('resumeBox').style.display='none';show('setup');
+};
 $('startBtn').textContent='Загрузка…';
-loadData().then(()=>{$('startBtn').textContent='Начать';initSetup()});
+loadData().then(()=>{
+ $('startBtn').textContent='Начать';initSetup();
+ // восстановление после обновления страницы
+ const s=store.get(SAVE);
+ if(s&&s.sig===GAMES.length){
+  S=s;
+  if(s.phase==='done'&&s.runs&&s.runs.length)showResults();
+  else if(s.cur)showMatch();
+ }else if(s){store.del(SAVE);$('resumeBox').style.display='none'}
+});
 </script>
 </body>
 </html>
