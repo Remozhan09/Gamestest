@@ -15,6 +15,19 @@ for f in sorted(glob.glob(os.path.join(ROOT, 'data', 'pc_*.txt'))):
         p = [x.strip() for x in parts[1].split(';') if x.strip()]
         m = [x.strip() for x in parts[2].split(';') if x.strip()]
         out[parts[0]] = {'p': p, 'm': m}
+# дополнительные плюсы из data/px_*.txt: Название|плюс;плюс
+for f in sorted(glob.glob(os.path.join(ROOT, 'data', 'px_*.txt'))):
+    for n, line in enumerate(open(f, encoding='utf-8'), 1):
+        line = line.strip()
+        if not line or line.startswith('#'):
+            continue
+        title, _, extra = line.partition('|')
+        if title not in out:
+            bad.append(f'{os.path.basename(f)}:{n}: {title}'); continue
+        for x in extra.split(';'):
+            x = x.strip()
+            if x and x not in out[title]['p']:
+                out[title]['p'].append(x)
 json.dump(out, open(os.path.join(ROOT, 'site', 'proscons.json'), 'w', encoding='utf-8'), ensure_ascii=False, separators=(',', ':'))
 print(f'описаний: {len(out)} из {len(titles)}; ошибок: {len(bad)}')
 for b in bad: print('  ', b)
